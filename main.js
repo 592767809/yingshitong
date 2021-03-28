@@ -2,15 +2,18 @@
 // @name 视频拦截器
 // @namespace https://github.com/592767809
 // @author yu ge
-// @version 0.1
+// @version 0.2
 // @match *://v.youku.com/*
 // @match *://v.qq.com/*
 // @match *://www.iqiyi.com/*
+// @match *://www.meiyouad.com/*
+// @match *://www.mgtv.com/*
 // @run-at document-start
 // @require https://unpkg.com/ajax-hook@2.0.0/dist/ajaxhook.min.js
+// @grant GM_xmlhttpRequest
 // ==/UserScript==
 
-var videotitle, m3u8url, m3u8text, videoid, bid;
+var videotitle, m3u8url, m3u8text, videoid, bid, headers;
 
 var storage = {
     // 通用
@@ -43,8 +46,6 @@ var handler = {
                             });
                             videotitle = videotitle + "_" + bid;
                             m3u8url = responsedata.vl.vi[0].ul.ui[3].url;
-                            // console.log(videotitle);
-                            // console.log(m3u8url);
                             posttopy({
                                 "title": videotitle,
                                 "m3u8url": m3u8url
@@ -61,22 +62,45 @@ var handler = {
                 if (xhr.readyState === 4 && xhr.responseURL.includes("cache.video.iqiyi.com/dash")){
                     var responsedata = JSON.parse(xhr.responseText);
                     videotitle = document.title.indexOf("-") !== -1 ? document.title.substring(0, document.title.indexOf("-")) : document.title.replace(/\s/, "");
-                    responsedata.data.program.video.forEach(function (items) {
-                        if(items.hasOwnProperty('m3u8')){
-                            m3u8text = items.m3u8;
-                            if (m3u8text.includes("#EXTM3U")){
-                                console.log("非加密视频");
-                                // console.log(m3u8text);
-                                // console.log(videotitle)
-                                posttopy({
-                                    "title": videotitle,
-                                    "m3u8text": m3u8text
-                                })
-                            }else {
-                                console.log("加密视频")
+                    if (videotitle !== "爱奇艺"){
+                        responsedata.data.program.video.forEach(function (items) {
+                            if(items.hasOwnProperty('m3u8')){
+                                m3u8text = items.m3u8;
+                                if (m3u8text.includes("#EXTM3U")){
+                                    console.log("非加密视频");
+                                    posttopy({
+                                        "title": videotitle,
+                                        "m3u8text": m3u8text
+                                    })
+                                }else {
+                                    console.log("加密视频")
+                                }
                             }
-                        }
-                    })
+                        })
+                    }
+                }
+            }
+        });
+    },
+    'www.mgtv.com': function () {
+        jsonpHook("web-disp.titan.mgtv.com", mgtvcb);
+    },
+    'www.meiyouad.com': function () {
+        ajaxHook({
+            onreadystatechange: function(xhr) {
+                if (xhr.readyState === 4 && xhr.responseURL.includes("sproxy.xlzqjd.com/?code=")){
+                    var responsedata = JSON.parse(xhr.responseText);
+                    var temp = window.localStorage["history-point"].substr(0, window.localStorage["history-point"].lastIndexOf('"'));
+                    temp = temp.substr(0, temp.lastIndexOf('"'));
+                    var t2 = temp.lastIndexOf('"');
+                    temp = temp.substr(0, temp.lastIndexOf('"'));
+                    var t1 = temp.lastIndexOf('"');
+                    videotitle = window.localStorage["history-point"].substr(t1+1, t2-t1-1);
+                    m3u8text = responsedata.m3u8;
+                    posttopy({
+                        "title": videotitle,
+                        "m3u8text": m3u8text
+                    });
                 }
             }
         });
@@ -113,6 +137,26 @@ function youkucb(rs, url){
         console.log("加密视频")
     }else {
         console.log("加密视频")
+    }
+}
+
+function mgtvcb(rs, url){
+    videotitle = document.getElementsByClassName("control-left")[0].getElementsByClassName("title")[0].textContent;
+    m3u8url = rs.info;
+    if (m3u8url.includes(".mpd?")){
+        console.log("加密视频")
+    }else {
+        console.log("非加密视频");
+        headers = {
+            "cookie": document.cookie,
+            "referer": window.location.href,
+            "user-agent": window.navigator.userAgent
+        };
+        posttopy({
+            "title": videotitle,
+            "m3u8url": m3u8url,
+            "headers": JSON.stringify(headers)
+        })
     }
 }
 
@@ -170,7 +214,9 @@ function jsonpHook(urlKey, cbFunc, options = {}) {
 }
 
 function posttopy(postdata) {
-    var xmlhttpyg7809 = new XMLHttpRequest();
-    xmlhttpyg7809.open("POST", "http://127.0.0.1:7809", true);
-    xmlhttpyg7809.send(JSON.stringify(postdata));
+    GM_xmlhttpRequest({
+        method: "post",
+        url: 'http://127.0.0.1:7809',
+        data: JSON.stringify(postdata)
+    });
 }

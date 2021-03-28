@@ -28,15 +28,23 @@ class Resquest(BaseHTTPRequestHandler):
         response = self.rfile.read(int(self.headers['content-length']))
         response = json.loads(response)
         title = response['title']
+        postdata = ''
         print('捕获标题：'+title)
+        if 'headers' in response.keys():
+            headers = json.loads(response['headers'])
+            headersdata = ''
+            for each in headers:
+                headersdata += each+':'+headers[each]+'\r\n'
+            postdata += '#HEAD,'+base64.b64encode(headersdata[:-2].encode('GBK')).decode()+'\r\n'
+
         if 'm3u8text' in response.keys():
             data = json.dumps({
                 'data': response['m3u8text']
             })
-            postdata = title + ',base64:' + base64.b64encode(data.encode('GBK')).decode()
+            postdata += title + ',base64:' + base64.b64encode(data.encode('GBK')).decode()
             posttocute(postdata, port)
         else:
-            postdata = title + ',' + response['m3u8url']
+            postdata += title + ',' + response['m3u8url']
             posttocute(postdata, port)
 
 def posttocute(postdata, port):
